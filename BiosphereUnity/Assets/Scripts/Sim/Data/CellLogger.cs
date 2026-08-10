@@ -54,7 +54,14 @@ namespace Biosphere.Sim
         }
 
         public int SampleIntervalSteps = 60;
-        [Range(0f, 1f)] public float PerCellSampleFraction = 1f;
+
+        /// <summary>Fraction of the living population sampled per snapshot,
+        /// clamped to [0,1] in SampleCells. (No [Range] attribute here: this is
+        /// a plain class, not a MonoBehaviour, so there is no inspector to
+        /// decorate -- and with `using System` in scope, `Range` resolves to
+        /// System.Range, which is not an attribute.)</summary>
+        public float PerCellSampleFraction = 1f;
+
         public int MaxBufferedCellRows = 500_000;
 
         private readonly List<AggregateRow> _aggregate = new();
@@ -103,9 +110,10 @@ namespace Biosphere.Sim
         {
             if (_cells.Count >= MaxBufferedCellRows) return;
 
+            float frac = math.saturate(PerCellSampleFraction);
             for (int i = 0; i < life.Count; i++)
             {
-                if (PerCellSampleFraction < 1f && _rng.NextFloat() > PerCellSampleFraction)
+                if (frac < 1f && _rng.NextFloat() > frac)
                     continue;
 
                 int2 p = life.Pos[i];
