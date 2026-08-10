@@ -40,36 +40,50 @@ if (-not (Test-Path ".gitignore")) {
     Die "No .gitignore here. Are you running this from the biosphere folder?"
 }
 
-# A partial .git may exist from an earlier attempt (including a stale
-# index.lock). Starting clean is more predictable than repairing it.
-if (Test-Path ".git") {
-    Warn "Existing .git found - removing it and starting fresh."
-    Remove-Item -Recurse -Force ".git"
+# ---- Repo + commit ------------------------------------------------------
+# The repo has already been initialised and committed for you. This block
+# only handles the case where you're starting from scratch (e.g. you deleted
+# .git, or cloned this script somewhere else).
+
+$hasRepo = Test-Path ".git"
+$hasCommit = $false
+if ($hasRepo) {
+    git rev-parse --verify HEAD *> $null
+    $hasCommit = ($LASTEXITCODE -eq 0)
 }
 
-# ---- Identity -----------------------------------------------------------
-$existingName  = (git config --global user.name)  2>$null
-$existingEmail = (git config --global user.email) 2>$null
+if ($hasCommit) {
+    $sha = (git rev-parse --short HEAD)
+    $n   = (git ls-files | Measure-Object -Line).Lines
+    Say "Existing commit found ($sha, $n files) - reusing it."
 
-git init --quiet
-git branch -M $Branch
+    # Pick up anything edited since that commit.
+    git add -A
+    if ((git diff --cached --name-only | Measure-Object -Line).Lines -gt 0) {
+        Say "Committing changes made since then..."
+        git commit --quiet -m "Update project files"
+    }
+}
+else {
+    if (-not $hasRepo) {
+        git init --quiet
+        git branch -M $Branch
+    }
 
-if (-not $existingName)  { git config user.name  "Abiram" }
-if (-not $existingEmail) { git config user.email "abiramr799@gmail.com" }
+    if (-not (git config --global user.name))  { git config user.name  "Abiram" }
+    if (-not (git config --global user.email)) { git config user.email "abiramr799@gmail.com" }
 
-# Unity assets are binary; normalising line endings on them corrupts files.
-git config core.autocrlf false
+    # Unity assets are binary; normalising line endings on them corrupts files.
+    git config core.autocrlf false
 
-# ---- Commit -------------------------------------------------------------
-Say "Staging files (venv, __pycache__ and *.csv are excluded by .gitignore)..."
-git add -A
+    Say "Staging files (venv, __pycache__ and *.csv are excluded by .gitignore)..."
+    git add -A
 
-$fileCount = (git diff --cached --name-only | Measure-Object -Line).Lines
-Say "$fileCount files staged."
+    $fileCount = (git diff --cached --name-only | Measure-Object -Line).Lines
+    if ($fileCount -eq 0) { Die "Nothing to commit. Something is wrong with .gitignore." }
+    Say "$fileCount files staged."
 
-if ($fileCount -eq 0) { Die "Nothing to commit. Something is wrong with .gitignore." }
-
-$msg = @"
+    $msg = @"
 Biosphere: numpy evolution prototype + Unity 2D WorldBox-style port
 
 Python prototype (repo root): cells with 5-trait heritable genomes on a
@@ -86,8 +100,12 @@ Unity code is syntax-checked only and has never been compiled.
 See BiosphereUnity/ARCHITECTURE.md section 9.
 "@
 
-git commit --quiet -m $msg
-Say "Committed."
+    git commit --quiet -m $msg
+    Say "Committed."
+}
+
+# Make sure we're on the requested branch name whatever happened above.
+if ((git rev-parse --abbrev-ref HEAD) -ne $Branch) { git branch -M $Branch }
 
 # ---- Push ---------------------------------------------------------------
 if (Get-Command gh -ErrorAction SilentlyContinue) {
