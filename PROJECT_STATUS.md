@@ -75,18 +75,32 @@ interval; exports to a pandas DataFrame or CSV/parquet.
 
 Public on GitHub: **https://github.com/abiramr44/biosphere** (`main`).
 
-**`BiosphereUnity/ProjectSettings/ProjectVersion.txt` IS committed and must stay
-committed.** It pins `6000.5.7f1` and is the only file Unity Hub uses to
-recognise a folder as a Unity project. Leaving it out (the original choice) made
-Hub's *Add project from repository* fail with "No Unity projects found in this
-repository and branch". Unity generates the rest of `ProjectSettings/` on first
-open, and since no SRP asset is generated, the project correctly lands on the
-Built-In Render Pipeline.
+**All of `BiosphereUnity/ProjectSettings/` is committed, plus `.meta` files.**
+This evolved in two steps and the end state is the standard Unity convention:
 
-Everything else in `ProjectSettings/` stays ignored. `.gitignore` also excludes
-`venv/`, `__pycache__/`, `*.csv` and Unity's `Library/`, so a clone is ~250 KB.
-Unity `.meta` files are NOT ignored and should be committed once Unity generates
-them on first import.
+1. Originally nothing in `ProjectSettings/` was committed. That broke Unity Hub's
+   *Add project from repository*, which identifies a Unity project purely by
+   `ProjectSettings/ProjectVersion.txt` — it failed with "No Unity projects found
+   in this repository and branch". So `ProjectVersion.txt` (pinning `6000.5.7f1`)
+   was committed.
+2. Once Unity opened the project it generated the rest of `ProjectSettings/` and
+   the `.meta` files, and a `git add -A` picked them up. Kept deliberately:
+   committing the full `ProjectSettings/` is what makes a Unity repo
+   reproducible, and `.meta` files carry the GUIDs that keep asset and scene
+   references from breaking.
+
+`GraphicsSettings.asset` has no SRP assigned, which is what pins the project to
+the Built-In Render Pipeline — required by the CG shaders.
+
+`.gitignore` excludes `Library/`, `Temp/`, `Obj/`, `Build/`, `Logs/`,
+`UserSettings/`, generated IDE files, `venv/`, `__pycache__/` and `*.csv`.
+
+Note: Unity 6.5+ deprecates the Built-In Render Pipeline (supported through 6.7
+LTS). Not urgent; the shader port path is in `ARCHITECTURE.md §3.3`.
+
+**`BiosphereUnity/CLAUDE.md`** briefs any Claude agent working inside the Unity
+project (via Unity MCP or Claude Code) — current status, the invariants that must
+not be "improved", known non-bugs, and the verification standard.
 
 Note: Unity 6.5+ deprecates the Built-In Render Pipeline (supported through 6.7
 LTS). Not urgent; the shader port path is in `ARCHITECTURE.md §3.3`.
