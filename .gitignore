@@ -1,0 +1,64 @@
+# ---------------- Python prototype ----------------
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.ipynb_checkpoints/
+
+# Simulation output. These accumulate from test runs; real research data
+# should be committed deliberately, not swept up by `git add .`.
+*.csv
+*.parquet
+!docs/**/*.csv
+
+# ---------------- Unity ----------------
+# Unity regenerates all of these. Committing them causes merge conflicts and
+# bloats the repo; Library/ alone can be several GB.
+BiosphereUnity/[Ll]ibrary/
+BiosphereUnity/[Tt]emp/
+BiosphereUnity/[Oo]bj/
+BiosphereUnity/[Bb]uild/
+BiosphereUnity/[Bb]uilds/
+BiosphereUnity/[Ll]ogs/
+BiosphereUnity/[Uu]ser[Ss]ettings/
+BiosphereUnity/[Mm]emoryCaptures/
+BiosphereUnity/[Rr]ecordings/
+BiosphereUnity/.vsconfig
+
+# Generated IDE project files
+*.csproj
+*.unityproj
+*.sln
+*.suo
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+.vs/
+.idea/
+.consulo/
+
+# Unity build artefacts
+*.apk
+*.aab
+*.unitypackage
+*.app
+crashlytics-build.properties
+sysinfo.txt
+
+# Asset meta files for ignored folders
+/[Aa]ssets/[Aa]ssetStoreTools*
+/[Aa]ssets/[Pp]lugins/[Ee]ditor/JetBrains*
+
+# ---------------- OS / editor ----------------
+.DS_Store
+Thumbs.db
+desktop.ini
+*~
+*.swp
