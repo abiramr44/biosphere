@@ -100,12 +100,120 @@ LTS). Not urgent; the shader port path is in `ARCHITECTURE.md §3.3`.
 
 **`BiosphereUnity/CLAUDE.md`** briefs any Claude agent working inside the Unity
 project (via Unity MCP or Claude Code) — current status, the invariants that must
-not be "improved", known non-bugs, and the verification standard.
+not be "improved", known non-bugs, the two runtime bugs found after first
+compile, and the verification standard. **Keep it in sync when status changes.**
 
-Note: Unity 6.5+ deprecates the Built-In Render Pipeline (supported through 6.7
-LTS). Not urgent; the shader port path is in `ARCHITECTURE.md §3.3`.
+## Recently completed (2026-08-10 session)
 
-## Recently completed (this session)
+- **First clean compile.** `EditorUtility.scriptCompilationFailed` is `false`;
+  console has zero `CS####` errors and nothing touching `Assets/Scripts` or
+  `Assets/Editor`. The only console errors present are from Unity's built-in
+  AI Assistant package (backend refresh failures + a `NullReferenceException`
+  in its own search popup) — unrelated to Biosphere code, safe to ignore.
+- **`Biosphere → 2. Run Headless Evolution Test` passed.** 64×48, seed
+  2086318005, 60 sim-days (86400 steps) in ~29.8s (~2896 steps/sec).
+  Population 8 → 1412 (births 1608, deaths 204), saturated every habitable
+  tile on day 44, froze thereafter (expected — see saturation freeze note
+  below). Trait deltas:
+  - `harvest_rate` +118.5% (0.04993 → 0.10912)
+  - `metabolism_rate` -40.7% (0.01266 → 0.00751)
+  - `repro_threshold` -14.8%, `mutation_rate` +78.0%, `durability_loss` +3.3%
+
+  Pass condition (harvest up / metabolism down) confirmed — signs match the
+  Python prototype; magnitudes are close to but not identical to the
+  reference range (expected, different RNG/reproduction draw order). This is
+  the first time the C# sim port has been run at all, and it verifies the
+  port logic against the Python oracle.
+- **`Biosphere → 1. Setup Project Scene` run for the first time.** Builds
+  `Assets/Scenes/Biosphere.unity` from code (5 roots: `Main Camera`, `Terrain`,
+  `Sprites`, `Particles`, `Game`), as documented.
+- **Found and fixed a real bug on first Play mode entry**: `GameBootstrap`
+  threw `NullReferenceException` in `BuildDecorLayer()` every frame because
+  `GameBootstrap.Sprites` (a `SpriteLayerRenderer`) was never actually wired,
+  despite `BiosphereSetup.cs` assigning it and the scene YAML looking
+  superficially correct. Root cause: `Assets/Scripts/Render/InstancedSpriteBatch.cs`
+  defined **two** top-level classes — `InstancedSpriteBatch` (plain
+  `IDisposable`, matches the filename) and `SpriteLayerRenderer` (a
+  `MonoBehaviour`, does *not* match the filename). Unity only generates an
+  importable, GUID-backed `MonoScript` asset for the class matching a file's
+  name; `SpriteLayerRenderer` compiled and worked fine via `AddComponent`/
+  `typeof` in code, but had **no GUID anywhere in the project** (confirmed via
+  `MonoImporter.GetAllRuntimeMonoScripts()` — 2155 scripts, zero matches), so
+  it could never be serialized into a scene. The scene YAML reflected this: every
+  other component's `m_Script` was `{fileID: 11500000, guid: ..., type: 3}`,
+  but `SpriteLayerRenderer`'s was a bare local `{fileID: ...}` with no guid,
+  pointing at an inline stub — which silently dropped the component on
+  scene reload/Play.
+  - **Fix**: split `SpriteLayerRenderer` into its own
+    `Assets/Scripts/Render/SpriteLayerRenderer.cs` (one MonoBehaviour per
+    filename, matching every other script in the project). Confirmed it now
+    has a proper GUID (`27ea5a756db8d074c851892a7fe5cbc7`), rebuilt the scene,
+    and re-entered Play mode with zero project errors.
+  - **General lesson for this codebase**: a `.cs` file must not define a
+    MonoBehaviour whose name doesn't match the filename, or component
+    wiring will silently break on scene save/reload even though everything
+    compiles and even though `EditorSceneManager.SaveScene` reports success.
+    Worth a quick grep (`grep -c "^\s*public.*class"`) over `Assets/Scripts`
+    if a similar "field looks assigned but is null at runtime" bug ever
+    recurs.
+- **First successful Play mode run.** World is actually 256×256
+  (`WorldConfig` default), not the 64×48 used by the headless test.
+  Terrain (grass/water/rock/tree decor) renders correctly, and a live cell
+  renders as the documented "slime sprite" (shaded pseudo-3D blob) at its
+  exact simulated position. Currently placeholder-magenta colored (expected —
+  placeholder atlas, not final art). No console errors from Biosphere code in
+  or after Play mode. This first pass only checked rendering, not camera
+  framing, and missed a second real bug (below) — worth remembering that
+  "no errors" is not the same as "actually looks right"; the user caught
+  this by asking for the real render, not the synthetic capture.
+- **Found and fixed a second real bug**: `PixelCameraController` (the
+  player's actual camera) silently ended up **disabled** every time the scene
+  was rebuilt, so it never framed the world (stuck at Unity's raw default
+  `orthographicSize: 5`, position `(0,0,0)`, i.e. showing nothing sensible).
+  This was invisible in the first pass because verification used a synthetic
+  top-down capture tool, not the real camera. Root cause was two compounding
+  Unity editor-scripting gotchas in `BiosphereSetup.BuildScene()`:
+  1. `camGo.AddComponent<PixelCameraController>()` calls `Awake()`
+     **immediately**, even in Edit mode, because the GameObject is active.
+     `Awake()` dereferences `cfg` (`cfg.GridW * 0.5f`) before the next line
+     had a chance to assign it — NRE, and Unity's standard response to an
+     exception in `Awake()` is to disable the component. That disabled state
+     then got baked into the saved scene.
+  2. Deactivating the GameObject before `AddComponent` (deferring `Awake()`
+     until after wiring) fixed the disabling, but `cfg` *itself* still ended
+     up null in the saved scene. Root cause: `EditorSceneManager.NewScene(...,
+     NewSceneMode.Single)` — the very first line of `BuildScene()` — unloads
+     the previously active scene, and as a side effect can invalidate/destroy
+     a `ScriptableObject` that was loaded via `AssetDatabase` before the
+     switch (reproduced directly: touching the old `cfg` reference right
+     after `NewScene(Single)` throws `MissingReferenceException`). The
+     *first* wiring call after `NewScene` (the camera's) caught `cfg` in
+     this destroyed state and silently serialized a null reference; every
+     *later* use of the same variable in the function (terrain, sprites,
+     particles, `GameBootstrap.Config`) worked because by then Unity had
+     transparently revalidated it.
+  - **Fix**: (1) `camGo.SetActive(false)` before `AddComponent` +
+    `SetPrivate`, `SetActive(true)` after. (2) Re-fetch
+    `cfg = AssetDatabase.LoadAssetAtPath<WorldConfig>(ConfigPath)` as the
+    first thing inside `BuildScene()`, immediately after `NewScene(...)`,
+    instead of trusting the reference passed in from `Setup()`. Rebuilt the
+    scene, confirmed `cfg` now has a real guid in the YAML, re-entered Play
+    mode, confirmed `camCtrl.enabled == true` and camera position correctly
+    lands on `(128, 128, -50)` (world center) with the derived orthographic
+    size — then captured the actual live-camera framing (120×67.5 world
+    units at 16 px/unit, matching a 1920×1080 screen at 1× zoom) and visually
+    confirmed correct top-down terrain + a live cell sprite, no console
+    errors.
+  - **General lesson for this codebase**: any object passed into or captured
+    across an `EditorSceneManager.NewScene(..., NewSceneMode.Single)` call
+    should be treated as potentially invalidated afterward — reload it fresh
+    rather than reusing the reference. And any `AddComponent<T>()` on a script
+    with logic in `Awake()` that depends on fields set by the *caller* right
+    after `AddComponent` returns needs the GameObject deactivated first, since
+    `Awake()` fires synchronously and immediately in the Editor, not just in
+    Play mode.
+
+## Recently completed (prior session)
 
 - **Unity 2D port scaffolded — `BiosphereUnity/`.** Full graphics-pipeline
   boilerplate for a WorldBox-style version, with the Python sim ported to

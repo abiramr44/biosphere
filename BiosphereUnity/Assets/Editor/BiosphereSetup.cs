@@ -190,6 +190,14 @@ namespace Biosphere.EditorTools
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene,
                                                     NewSceneMode.Single);
 
+            // NewScene(..., NewSceneMode.Single) unloads the previously active
+            // scene, and as a side effect can invalidate any ScriptableObject
+            // (like cfg) that was loaded via AssetDatabase before the switch --
+            // touching it right afterward throws MissingReferenceException.
+            // Re-fetching it fresh here guarantees every wiring call below
+            // uses a live reference, not a stale one caught mid-teardown.
+            cfg = AssetDatabase.LoadAssetAtPath<WorldConfig>(ConfigPath);
+
             // --- Camera ---
             var camGo = new GameObject("Main Camera", typeof(Camera));
             camGo.tag = "MainCamera";
@@ -197,8 +205,18 @@ namespace Biosphere.EditorTools
             cam.orthographic = true;
             cam.clearFlags = CameraClearFlags.SolidColor;
             cam.backgroundColor = new Color(0.04f, 0.05f, 0.09f);
+
+            // Deactivate before AddComponent: Unity calls Awake() the moment a
+            // component is added to an ACTIVE GameObject, even in the Editor
+            // outside Play mode. PixelCameraController.Awake() dereferences
+            // cfg immediately -- if it's still unassigned at that point, Awake
+            // throws, Unity disables the component, and a disabled camera
+            // controller gets baked straight into the saved scene. Wiring cfg
+            // while the object is inactive defers Awake() until SetActive(true).
+            camGo.SetActive(false);
             var camCtrl = camGo.AddComponent<PixelCameraController>();
             SetPrivate(camCtrl, "cfg", cfg);
+            camGo.SetActive(true);
 
             // --- Terrain quad ---
             var terrainGo = new GameObject("Terrain",

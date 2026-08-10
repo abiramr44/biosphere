@@ -12,28 +12,43 @@ point of the connection.
 
 ## 1. Current status — read this first
 
-**The Unity code has never successfully compiled.** It was written without a
-Unity install available, syntax-checked with a C# parser only, then debugged
-error-by-error. As of the last session three compile errors were found and
-fixed. There are probably more.
-
-Last known state:
+**The project compiles, the simulation is verified, and Play mode renders.**
+As of 2026-08-10 it is a working prototype — no longer the never-compiled
+skeleton it started as.
 
 | | |
 |---|---|
 | Editor | Unity 6.5 (6000.5.7f1), DX12 |
 | Render pipeline | **Built-In** (deliberate — see §3) |
 | Packages | Burst, Collections, Mathematics, uGUI, AI Assistant, AI Inference |
-| Compile | last fix was `using Unity.Jobs` in `GameBootstrap.cs`; recompile state unverified |
-| Scene | **not yet built** — `Biosphere → 1. Setup Project Scene` has never run successfully |
-| Play mode | never reached |
-| Headless sim test | never run |
+| Compile | **clean.** `EditorUtility.scriptCompilationFailed == false`, zero `CS####` |
+| Headless sim test | **passed** — see below |
+| Scene | **built** — `Assets/Scenes/Biosphere.unity`, 5 roots |
+| Play mode | **works** — terrain + live cell sprites render, no Biosphere errors |
+| World size in scene | 256×256 (`WorldConfig` default) |
 
-**Your first job:** get a clean compile, then run
-`Biosphere → 2. Run Headless Evolution Test` *before* anything visual. It needs
-no scene and no rendering, so it separates "is the simulation port correct?"
-from "is the renderer wired?". Only after it passes should you care about what's
-on screen.
+**Headless evolution test, seed 2086318005**, 64×48, 60 sim-days (86,400 steps)
+in ~29.8 s (~2,896 steps/sec). Population 8 → 1412, births 1608, deaths 204,
+saturated every habitable tile on day 44 then froze (expected — §4).
+
+| trait | change |
+|---|---|
+| `harvest_rate` | **+118.5%** (0.04993 → 0.10912) |
+| `metabolism_rate` | **−40.7%** (0.01266 → 0.00751) |
+| `repro_threshold` | −14.8% |
+| `mutation_rate` | +78.0% |
+| `durability_loss` | +3.3% |
+
+Pass condition met (harvest up, metabolism down); signs match the Python oracle.
+**The C# port is verified against the reference implementation.**
+
+Console errors from Unity's own **AI Assistant package** (backend refresh
+failures, a `NullReferenceException` in its search popup) are unrelated to this
+project and safe to ignore. Don't chase them.
+
+**Next unstarted work:** the placeholder atlas is still placeholder art; the
+saturation freeze (§4) is still unaddressed; camera framing has been verified
+once but tools/HUD interaction have not been exercised.
 
 ### Errors already found and fixed — expect more of the same kind
 
@@ -53,6 +68,39 @@ Six files deliberately do **not** import `UnityEngine` — they are pure
 simulation and must stay engine-agnostic: `CellLogger`, `WorldGrid`, `Genome`,
 `LifeGrid`, `LifeJobs`, `FieldMath`. Don't "fix" them by adding
 `using UnityEngine;`. Fix the specific symbol instead.
+
+### Two runtime bugs found after the first clean compile — learn from both
+
+Compiling cleanly proved nothing. Both of these passed compilation, and the
+second even survived a "no console errors" check.
+
+**1. One MonoBehaviour per file, named after the file. Non-negotiable.**
+`SpriteLayerRenderer` was originally declared inside
+`InstancedSpriteBatch.cs`. Unity only generates a GUID-backed `MonoScript`
+asset for the class matching the *filename*, so `SpriteLayerRenderer` had no
+GUID anywhere in the project. It worked via `AddComponent`/`typeof` in code but
+**could never be serialized into a scene** — the scene YAML held a bare local
+`fileID` with no guid, and the component was silently dropped on reload, giving
+a `NullReferenceException` every frame in `BuildDecorLayer()`.
+Symptom to watch for: *a field looks assigned in the inspector/YAML but is null
+at runtime.* Fixed by splitting it into its own file.
+
+**2. `AddComponent<T>()` runs `Awake()` synchronously, in Edit mode too.**
+In `BiosphereSetup.BuildScene()`, `AddComponent<PixelCameraController>()` fired
+`Awake()`, which dereferenced `cfg` before the *next line* assigned it → NRE →
+Unity disabled the component → that disabled state was baked into the saved
+scene. The camera never framed the world. Fix: `SetActive(false)` before
+`AddComponent`, wire fields, then `SetActive(true)`.
+
+**2b. `EditorSceneManager.NewScene(..., Single)` can invalidate references held
+across it.** A `WorldConfig` loaded via `AssetDatabase` *before* the scene
+switch was destroyed by it (`MissingReferenceException` on touch), so the first
+wiring call after `NewScene` silently serialized null. Re-fetch any asset
+reference immediately *after* `NewScene`, don't trust one passed in.
+
+**The meta-lesson: "no console errors" is not "it works".** Bug 2 was missed on
+the first pass because verification used a synthetic top-down capture instead of
+the real camera. Verify through the actual path the player uses.
 
 ---
 

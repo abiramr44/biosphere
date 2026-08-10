@@ -62,6 +62,10 @@ sysinfo.txt
 /[Aa]ssets/[Aa]ssetStoreTools*
 /[Aa]ssets/[Pp]lugins/[Ee]ditor/JetBrains*
 
+# ---------------- Agent tooling ----------------
+# Per-machine Claude Code permissions. Machine-specific, not project config.
+**/.claude/settings.local.json
+
 # ---------------- OS / editor ----------------
 .DS_Store
 Thumbs.db
