@@ -179,7 +179,16 @@ namespace Biosphere.UI
             EnsureStyles();
 
             float x = Screen.width - PanelWidth - 10;
-            GUI.Box(new Rect(x, 10, PanelWidth, Screen.height - 20), GUIContent.none, _panel);
+            var panelRect = new Rect(x, 10, PanelWidth, Screen.height - 20);
+
+            // Tell the game not to treat clicks on this panel as world clicks.
+            // GUI coordinates are top-left origin; Input.mousePosition is
+            // bottom-left, hence the Y flip.
+            var guiMouse = new Vector2(Input.mousePosition.x,
+                                       Screen.height - Input.mousePosition.y);
+            Game.PointerOverUi = panelRect.Contains(guiMouse);
+
+            GUI.Box(panelRect, GUIContent.none, _panel);
 
             GUILayout.BeginArea(new Rect(x + 10, 20, PanelWidth - 20, Screen.height - 40));
 

@@ -61,6 +61,10 @@ namespace Biosphere.Core
         /// indices shift on every swap-remove, IDs never do.</summary>
         public int SelectedCellId { get; private set; }
 
+        /// <summary>Set by DashboardHud each frame. Stops world clicks from
+        /// firing when the cursor is over the HUD panel.</summary>
+        public bool PointerOverUi;
+
         private int _decorCount;
         private int _decorRevision = -1;
         private bool _renderersReady;
@@ -217,8 +221,11 @@ namespace Biosphere.Core
             if (Input.GetKeyDown(KeyCode.C)) ColorGene = ColorGene >= GeneTable.Count - 1 ? -1 : ColorGene + 1;
 
             if (!Input.GetMouseButtonDown(0)) return;
-            if (UnityEngine.EventSystems.EventSystem.current != null &&
-                UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject()) return;
+            // The HUD is IMGUI, which has no EventSystem, so it can't be asked
+            // "is the pointer over UI?". DashboardHud sets this flag from its own
+            // panel rect instead. (Using EventSystem here would also force this
+            // assembly to reference UnityEngine.UI for no benefit.)
+            if (PointerOverUi) return;
             if (!PixelCamera.ScreenToTile(Input.mousePosition, out int tx, out int ty)) return;
 
             ApplyTool(tx, ty);

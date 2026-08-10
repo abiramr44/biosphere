@@ -29,14 +29,15 @@ namespace Biosphere.EditorTools
             for (int i = 0; i < levels.Length; i++)
             {
                 QualitySettings.SetQualityLevel(i, false);
+                // Only settings that are stable across 2022.3 -> Unity 6 are set
+                // here. softParticles / billboardsFaceCameraPosition /
+                // realtimeReflectionProbes were deliberately dropped: they are
+                // deprecated or removed in Unity 6 and irrelevant to a 2D game.
                 QualitySettings.antiAliasing = 0;                                  // MSAA smears pixel edges
                 QualitySettings.anisotropicFiltering = AnisotropicFiltering.Disable;
                 QualitySettings.vSyncCount = 1;                                    // no tearing while panning
                 QualitySettings.globalTextureMipmapLimit = 0;                      // full-res textures
                 QualitySettings.shadows = ShadowQuality.Disable;                   // top-down 2D
-                QualitySettings.softParticles = false;
-                QualitySettings.realtimeReflectionProbes = false;
-                QualitySettings.billboardsFaceCameraPosition = false;
             }
             QualitySettings.SetQualityLevel(original, true);
 
