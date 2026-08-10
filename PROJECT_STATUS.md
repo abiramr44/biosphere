@@ -75,10 +75,21 @@ interval; exports to a pandas DataFrame or CSV/parquet.
 
 Public on GitHub: **https://github.com/abiramr44/biosphere** (`main`).
 
-`ProjectSettings/` is deliberately NOT committed — Unity generates it and it's
-version-specific. `.gitignore` excludes `venv/`, `__pycache__/`, `*.csv` and
-Unity's `Library/`, so a clone is ~250 KB. Unity `.meta` files are NOT ignored
-and should be committed once Unity generates them on first import.
+**`BiosphereUnity/ProjectSettings/ProjectVersion.txt` IS committed and must stay
+committed.** It pins `6000.5.7f1` and is the only file Unity Hub uses to
+recognise a folder as a Unity project. Leaving it out (the original choice) made
+Hub's *Add project from repository* fail with "No Unity projects found in this
+repository and branch". Unity generates the rest of `ProjectSettings/` on first
+open, and since no SRP asset is generated, the project correctly lands on the
+Built-In Render Pipeline.
+
+Everything else in `ProjectSettings/` stays ignored. `.gitignore` also excludes
+`venv/`, `__pycache__/`, `*.csv` and Unity's `Library/`, so a clone is ~250 KB.
+Unity `.meta` files are NOT ignored and should be committed once Unity generates
+them on first import.
+
+Note: Unity 6.5+ deprecates the Built-In Render Pipeline (supported through 6.7
+LTS). Not urgent; the shader port path is in `ARCHITECTURE.md §3.3`.
 
 ## Recently completed (this session)
 

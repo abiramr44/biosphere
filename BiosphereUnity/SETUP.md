@@ -15,46 +15,58 @@ Unity Hub is only a launcher; it can't open anything on its own.
    WebGL** — several GB each and unused here.
 4. Install. It's a 5–8 GB download.
 
-## Step 2 — Create an empty project
+## Step 2 — Get the project (pick one route)
 
-1. Hub → **Projects** → **New project**.
-2. Editor version: the one you just installed.
-3. Template: **2D (Built-In Render Pipeline)**.
+### Route A — Hub clones it for you (easiest)
 
-   > ⚠️ **Not 2D (URP).** The shaders in this repo are built-in-pipeline CG.
-   > Under URP everything renders **solid magenta**. If the template list only
-   > shows "2D (URP)", scroll — the built-in one is usually just called **2D**
-   > or **2D (Built-In Render Pipeline)**.
+Hub → **Projects** → **Add ▾** → **Add project from repository**.
 
-4. Project name: `BiosphereUnity`. Location: anywhere (Documents is fine).
-5. **Create project**, wait for it to open, then **close Unity**.
-
-## Step 3 — Copy this repo's files in
-
-You now have two folders. Call them:
-
-- **REPO** — the cloned repo's `BiosphereUnity/` folder (contains `Assets/`,
-  `Packages/`, `ARCHITECTURE.md`)
-- **PROJECT** — the folder Unity just created
-
-Copy, overwriting when asked:
-
-| From | To |
+| Field | Value |
 |---|---|
-| `REPO\Assets\` | `PROJECT\Assets\` |
-| `REPO\Packages\manifest.json` | `PROJECT\Packages\manifest.json` |
+| Source control provider | GitHub |
+| Personal Access Token | connect once, if you haven't |
+| Repository | `abiramr44/biosphere` |
+| Branch or commit | `main` |
+| Location | wherever you keep projects |
 
-Nothing else. `ProjectSettings/` stays as Unity generated it — that folder is
-version- and machine-specific, which is why the repo doesn't ship one.
+Hub finds the project at `BiosphereUnity/` inside the repo and clones the whole
+thing. Skip to Step 4.
 
-> **Prefer not to overwrite `manifest.json`?** Skip it, and instead add three
-> packages after opening: **Window → Package Manager → + → Add package by
-> name**, entering `com.unity.burst`, then `com.unity.collections`, then
-> `com.unity.mathematics`. Identical result.
+> **"No Unity projects found in this repository and branch."**
+> Hub identifies a Unity project by the presence of
+> `ProjectSettings/ProjectVersion.txt`. That file is committed — if you see this
+> error, your clone predates it. Pull the latest `main` and retry.
 
-## Step 4 — Reopen and let it compile
+> **Editor version mismatch.** `ProjectVersion.txt` pins **6000.5.7f1**. If you
+> installed a different version, Hub will offer to open it with yours — that's
+> fine, anything 2022.3+ works. Just don't let Hub talk you into an upgrade you
+> didn't intend.
 
-Open PROJECT from the Hub. On first open Unity will:
+### Route B — clone manually and add the folder
+
+```
+git clone https://github.com/abiramr44/biosphere.git
+```
+
+Then Hub → **Add ▾** → **Add project from disk** → select the
+**`biosphere/BiosphereUnity`** subfolder (not the repo root — the repo root
+holds the Python prototype too).
+
+## Step 3 — Render pipeline sanity
+
+Nothing to do here yet, but know what you're getting: the project has no SRP
+asset assigned, so Unity opens it on the **Built-In Render Pipeline**. That is
+deliberate — the three shaders are built-in CG and render **solid magenta**
+under URP or HDRP. Step 5 verifies it.
+
+> Unity 6.5+ shows a banner saying Built-In is deprecated, supported through
+> **Unity 6.7 LTS**. True, and not urgent. When it does become urgent,
+> `ARCHITECTURE.md §3.3` has the shader port steps — it's a mechanical
+> `CGPROGRAM` → `HLSLPROGRAM` conversion, not a redesign.
+
+## Step 4 — Open it and let it compile
+
+Open the project from the Hub. On first open Unity will:
 
 - download Burst, Collections and Mathematics (needs internet, ~1 minute)
 - import the scripts and shaders
@@ -74,7 +86,8 @@ A **`Biosphere`** menu appears in the menu bar once the editor scripts compile.
 
 2. **`Biosphere → Check Render Pipeline`**
    Should log *"Built-in Render Pipeline detected. Correct."*
-   If it logs an error, you're on URP — go back to Step 2.
+   If it errors, an SRP asset got assigned somehow — clear
+   **Edit → Project Settings → Graphics → Scriptable Render Pipeline Settings**.
 
 3. **`Biosphere → 1. Setup Project Scene`**
    Creates the `WorldConfig` asset (256×256 tiles, 16 px/unit), generates a
@@ -127,7 +140,8 @@ steps/sec at the real target world size.
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| Everything is **magenta** | Project is on URP/HDRP | Recreate from the 2D Built-In template (Step 2) |
+| Hub: **"No Unity projects found in this repository"** | Clone predates `ProjectSettings/ProjectVersion.txt` | Pull latest `main`, retry |
+| Everything is **magenta** | An SRP asset is assigned | Clear Project Settings → Graphics → SRP Settings |
 | `The type or namespace name 'Burst' does not exist` | Packages didn't install | Package Manager → + → Add package by name (Step 3 note) |
 | **No `Biosphere` menu** | Compile errors | Read the Console; the menu only registers once `Assets/Editor` compiles |
 | Black screen, no terrain | Scene not built | Run `Biosphere → 1. Setup Project Scene` |
