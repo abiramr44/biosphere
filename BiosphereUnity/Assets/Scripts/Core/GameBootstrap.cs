@@ -1,4 +1,7 @@
 using Unity.Collections;
+using Unity.Jobs;          // Schedule() on IJobParallelFor is an extension method
+                           // in IJobParallelForExtensions -- without this using,
+                           // job.Schedule(...) fails with CS1061.
 using Unity.Mathematics;
 using UnityEngine;
 using Biosphere.CameraRig;
