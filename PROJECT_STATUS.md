@@ -71,6 +71,15 @@ interval; exports to a pandas DataFrame or CSV/parquet.
 
 - **World expansion**: user's stated plan is to test the small sandbox first, then ask to expand `GRID_W`/`GRID_H` back up (or further) once satisfied. Also the fix for population-saturation freeze (see Verified findings above) is still unaddressed — needs either a bigger world or an ongoing-turnover mechanism.
 
+## Repository
+
+Public on GitHub: **https://github.com/abiramr44/biosphere** (`main`).
+
+`ProjectSettings/` is deliberately NOT committed — Unity generates it and it's
+version-specific. `.gitignore` excludes `venv/`, `__pycache__/`, `*.csv` and
+Unity's `Library/`, so a clone is ~250 KB. Unity `.meta` files are NOT ignored
+and should be committed once Unity generates them on first import.
+
 ## Recently completed (this session)
 
 - **Unity 2D port scaffolded — `BiosphereUnity/`.** Full graphics-pipeline
